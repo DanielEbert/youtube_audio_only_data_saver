@@ -22,6 +22,9 @@
 
   function strip(pr) {
     if (!enabled()) return pr;
+    // Apply the audio-only config before handing the player a video-less
+    // response; otherwise the player rejects it ("video can't be played").
+    fixYtConfig();
     try {
       var sd = pr && pr.streamingData;
       if (sd) {
@@ -36,23 +39,39 @@
     return pr;
   }
 
-  function ytConfigFix(config_) {
-    if (!enabled() || !config_) return;
+  // True once at least one watch context has been switched to audio-only.
+  var configReady = false;
+
+  function patchWatchContext(ctx) {
+    if (!ctx) return false;
     try {
-      var pk =
-        (((config_ || 0).WEB_PLAYER_CONTEXT_CONFIGS || 0)
-          .WEB_PLAYER_CONTEXT_CONFIG_ID_KEVLAR_WATCH) ||
-        0;
-      if (pk) {
-        pk.deviceIsAudioOnly = true;
-        var usp = new URLSearchParams("?" + pk.serializedExperimentFlags);
-        usp.set("html5_onesie_audio_only_playback", "true");
-        usp.set("allow_vb_audio_formats", "true");
-        usp.set("allow_vb_audio_formats_with_mta", "true");
-        usp.set("ws_use_centralized_hqa_filter", "true");
-        usp.set("web_cinematic_watch_settings", "false");
-        usp.set("web_l3_storyboard", "false");
-        pk.serializedExperimentFlags = String(usp).replace(/^\?+/g, "");
+      ctx.deviceIsAudioOnly = true;
+      var usp = new URLSearchParams("?" + (ctx.serializedExperimentFlags || ""));
+      usp.set("html5_onesie_audio_only_playback", "true");
+      usp.set("allow_vb_audio_formats", "true");
+      usp.set("allow_vb_audio_formats_with_mta", "true");
+      usp.set("ws_use_centralized_hqa_filter", "true");
+      usp.set("web_cinematic_watch_settings", "false");
+      usp.set("web_l3_storyboard", "false");
+      ctx.serializedExperimentFlags = String(usp).replace(/^\?+/g, "");
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  // Patch every watch player context (desktop KEVLAR and mobile MWEB) rather
+  // than only the desktop one, so audio-only mode is honoured on m.youtube.com.
+  function ytConfigFix(config_) {
+    if (!config_) return false;
+    try {
+      var cfgs = config_.WEB_PLAYER_CONTEXT_CONFIGS;
+      if (cfgs) {
+        Object.keys(cfgs).forEach(function (key) {
+          if (String(key).indexOf("WATCH") !== -1) {
+            if (patchWatchContext(cfgs[key])) configReady = true;
+          }
+        });
       }
       var ef = config_.EXPERIMENT_FLAGS;
       if (ef) {
@@ -60,15 +79,51 @@
         ef.mweb_cinematic_watch = false;
       }
     } catch (e) {}
+    return configReady;
   }
 
   function fixYtConfig() {
+    if (!enabled()) return false;
     try {
-      if (window.yt && window.yt.config_) ytConfigFix(window.yt.config_);
+      if (window.yt && window.yt.config_) return ytConfigFix(window.yt.config_);
     } catch (e) {}
+    return false;
   }
 
-  // 1. Strip video formats from the inline player response.
+  // Resolve once the audio-only config is in place (or the timeout elapses).
+  // Used to hold back stripped player responses so the player is never handed a
+  // video-less response while it is still in video mode.
+  function whenConfigReady(timeoutMs) {
+    return new Promise(function (resolve) {
+      var t0 = Date.now();
+      (function tick() {
+        if (fixYtConfig() || Date.now() - t0 >= timeoutMs) {
+          resolve(configReady);
+          return;
+        }
+        setTimeout(tick, 25);
+      })();
+    });
+  }
+
+  // 1. Patch the player config the moment YouTube defines window.yt.
+  var ytStored;
+  try {
+    Object.defineProperty(window, "yt", {
+      configurable: true,
+      get: function () {
+        return ytStored;
+      },
+      set: function (v) {
+        ytStored = v;
+        try {
+          if (enabled() && v && v.config_) ytConfigFix(v.config_);
+        } catch (e) {}
+      },
+    });
+  } catch (e) {}
+
+  // 2. Strip video formats from the inline player response.
   var stored;
   try {
     Object.defineProperty(window, "ytInitialPlayerResponse", {
@@ -82,7 +137,9 @@
     });
   } catch (e) {}
 
-  // 2. Strip video formats from player API responses.
+  // 3. Strip video formats from player API responses.  The response is held
+  // back until the audio-only config is applied so the player never sees a
+  // stripped response while still in video mode.
   try {
     var origFetch = window.fetch;
     window.fetch = function (input, init) {
@@ -90,9 +147,10 @@
       var p = origFetch.apply(this, arguments);
       if (url && url.indexOf("/youtubei/v1/player") !== -1) {
         return p.then(function (resp) {
-          return resp
-            .clone()
-            .json()
+          return whenConfigReady(2000)
+            .then(function () {
+              return resp.clone().json();
+            })
             .then(function (json) {
               strip(json);
               return new Response(JSON.stringify(json), {
@@ -110,7 +168,7 @@
     };
   } catch (e) {}
 
-  // 3. Force the player config as early as possible (bounded retries, ~5s).
+  // 4. Force the player config as early as possible (bounded retries, ~5s).
   var configTries = 0;
   var configTimer = setInterval(function () {
     fixYtConfig();

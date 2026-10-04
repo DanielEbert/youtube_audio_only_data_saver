@@ -8,6 +8,7 @@ const code = fs.readFileSync(SRC, "utf8");
 let audioAttr = null;
 const intervals = [];
 const clearedIntervals = [];
+const timers = [];
 
 function makeResponse() {
   return {
@@ -65,6 +66,10 @@ const sandbox = {
   clearInterval: (id) => {
     clearedIntervals.push(id);
   },
+  setTimeout: (fn) => {
+    timers.push(fn);
+    return timers.length;
+  },
   URLSearchParams,
   Response,
   console
@@ -83,6 +88,9 @@ function watchConfig() {
     WEB_PLAYER_CONTEXT_CONFIGS: {
       WEB_PLAYER_CONTEXT_CONFIG_ID_KEVLAR_WATCH: {
         serializedExperimentFlags: "a=b&c=d"
+      },
+      WEB_PLAYER_CONTEXT_CONFIG_ID_MWEB_WATCH: {
+        serializedExperimentFlags: "m=n"
       }
     },
     EXPERIMENT_FLAGS: {
@@ -144,6 +152,12 @@ function check(name, cond, extra) {
 
   console.log("\nPlayer API fetch filter:");
   audioAttr = "1";
+  window.yt = { config_: watchConfig() };
+  check(
+    "config readied by yt assignment",
+    window.yt.config_.WEB_PLAYER_CONTEXT_CONFIGS
+      .WEB_PLAYER_CONTEXT_CONFIG_ID_KEVLAR_WATCH.deviceIsAudioOnly === true
+  );
   const playerJson = await (await window.fetch("/youtubei/v1/player?key=x", {})).json();
   check("fetch: muxed formats cleared", playerJson.streamingData.formats.length === 0);
   check(
@@ -169,6 +183,14 @@ function check(name, cond, extra) {
     "config: EXPERIMENT_FLAGS patched",
     window.yt.config_.EXPERIMENT_FLAGS.kevlar_watch_cinematics === false
   );
+  const mweb = window.yt.config_.WEB_PLAYER_CONTEXT_CONFIGS.WEB_PLAYER_CONTEXT_CONFIG_ID_MWEB_WATCH;
+  check("config: mweb deviceIsAudioOnly set", mweb.deviceIsAudioOnly === true);
+  check(
+    "config: mweb audio-only flag added",
+    mweb.serializedExperimentFlags.indexOf("html5_onesie_audio_only_playback=true") !== -1,
+    mweb.serializedExperimentFlags
+  );
+  check("config: mweb existing flags kept", mweb.serializedExperimentFlags.indexOf("m=n") !== -1);
 
   audioAttr = "0";
   window.yt = { config_: watchConfig() };

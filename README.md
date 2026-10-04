@@ -4,16 +4,10 @@ A Firefox extension that streams audio only on YouTube by blocking video
 streams, saving mobile data and battery. Toggle it on/off from the toolbar
 popup.
 
-## Layout
-
-- `youtube-audio-only/` – extension source (`manifest.json`, `content.js`, `inject.js`, popup)
-- `scripts/release.py` – version bump, AMO signing, update manifest, deploy
-- `test/` – player-response filter unit tests
-
 ## Commands
 
 ```sh
-make            # build package and copy to /root/dufs
+make            # build package and copy to /root/dufs (my dufs server)
 make build      # package into dist/*.zip and dist/*.xpi
 make lint       # run web-ext lint
 make test       # run unit tests

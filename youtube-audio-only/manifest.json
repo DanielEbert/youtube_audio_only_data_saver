@@ -1,7 +1,7 @@
 {
   "manifest_version": 2,
   "name": "YouTube Audio Only (Data Saver)",
-  "version": "1.3.4",
+  "version": "1.3.5",
   "description": "Stream audio only on YouTube to save mobile data and battery.",
   "browser_specific_settings": {
     "gecko": {
