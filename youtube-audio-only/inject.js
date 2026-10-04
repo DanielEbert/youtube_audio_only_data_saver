@@ -95,6 +95,13 @@
   // video-less response while it is still in video mode.
   function whenConfigReady(timeoutMs) {
     return new Promise(function (resolve) {
+      // Nothing to wait for when disabled (no config is applied) or when the
+      // config is already in place: resolve synchronously instead of polling
+      // for the full timeout.
+      if (!enabled() || configReady) {
+        resolve(configReady);
+        return;
+      }
       var t0 = Date.now();
       (function tick() {
         if (fixYtConfig() || Date.now() - t0 >= timeoutMs) {
@@ -123,7 +130,11 @@
     });
   } catch (e) {}
 
-  // 2. Strip video formats from the inline player response.
+  // 2. Strip video formats from the inline player response, using the same
+  // readiness gate as the fetch path.  If the config is not in place yet the
+  // response is left intact and stripped once it is; otherwise the player can
+  // be handed a video-less response while still in video mode and reject it
+  // ("video can't be played").
   var stored;
   try {
     Object.defineProperty(window, "ytInitialPlayerResponse", {
@@ -132,7 +143,15 @@
         return stored;
       },
       set: function (v) {
-        stored = strip(v);
+        stored = v;
+        if (!enabled()) return;
+        if (fixYtConfig()) {
+          strip(v);
+        } else {
+          whenConfigReady(2000).then(function () {
+            strip(v);
+          });
+        }
       },
     });
   } catch (e) {}
@@ -145,7 +164,7 @@
     window.fetch = function (input, init) {
       var url = typeof input === "string" ? input : input && input.url;
       var p = origFetch.apply(this, arguments);
-      if (url && url.indexOf("/youtubei/v1/player") !== -1) {
+      if (enabled() && url && url.indexOf("/youtubei/v1/player") !== -1) {
         return p.then(function (resp) {
           return whenConfigReady(2000)
             .then(function () {

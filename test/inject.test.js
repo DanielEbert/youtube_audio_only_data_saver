@@ -112,6 +112,17 @@ function check(name, cond, extra) {
   }
 }
 
+// Run the sandbox's queued setTimeout callbacks (inject.js polls with these
+// while waiting for the player config) and drain the resulting microtasks.
+async function flushTimers() {
+  let guard = 0;
+  while (timers.length && guard++ < 1000) {
+    const pending = timers.splice(0);
+    pending.forEach((fn) => fn());
+    await Promise.resolve();
+  }
+}
+
 (async function main() {
   console.log("Player response filter:");
 
@@ -119,9 +130,19 @@ function check(name, cond, extra) {
     throw new Error("inject.js did not install a ytInitialPlayerResponse setter");
   }
 
+  // The inline response arrives before the player config: it must be exposed
+  // intact and only stripped once the audio-only config is applied.
   audioAttr = "1";
-  let pr = load(makeResponse());
-  check("muxed formats cleared", Array.isArray(pr.streamingData.formats) && pr.streamingData.formats.length === 0);
+  const held = load(makeResponse());
+  check(
+    "initial: held back until config ready",
+    held.streamingData.formats.length === 1 &&
+      held.streamingData.adaptiveFormats.some((f) => f.mimeType === "video/mp4")
+  );
+  window.yt = { config_: watchConfig() };
+  await flushTimers();
+  let pr = held;
+  check("initial: stripped once config ready", pr.streamingData.formats.length === 0);
   check(
     "video adaptive formats removed",
     pr.streamingData.adaptiveFormats.every((f) => f.mimeType.indexOf("audio/") === 0),
@@ -166,6 +187,26 @@ function check(name, cond, extra) {
   );
   const otherJson = await (await window.fetch("/youtubei/v1/browse")).json();
   check("fetch: non-player request untouched", otherJson.streamingData.formats.length === 1);
+
+  console.log("\nDisabled mode:");
+  audioAttr = "0";
+  const timersBefore = timers.length;
+  const disabledResp = await Promise.race([
+    window.fetch("/youtubei/v1/player?key=x", {}),
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error("disabled fetch stalled")), 1000)
+    ),
+  ]);
+  check(
+    "disabled: fetch resolves without readiness polling",
+    timers.length === timersBefore
+  );
+  const disabledJson = await disabledResp.json();
+  check(
+    "disabled: player response untouched",
+    disabledJson.streamingData.formats.length === 1
+  );
+  audioAttr = "1";
 
   console.log("\nPlayer config fix:");
   audioAttr = "1";
