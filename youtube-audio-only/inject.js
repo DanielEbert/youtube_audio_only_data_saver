@@ -59,9 +59,12 @@
         ef.kevlar_watch_cinematics = false;
         ef.mweb_cinematic_watch = false;
       }
-      if (config_.PLAYER_CONFIG) {
-        config_.PLAYER_CONFIG.deviceIsAudioOnly = true;
-      }
+    } catch (e) {}
+  }
+
+  function fixYtConfig() {
+    try {
+      if (window.yt && window.yt.config_) ytConfigFix(window.yt.config_);
     } catch (e) {}
   }
 
@@ -107,11 +110,11 @@
     };
   } catch (e) {}
 
-  // 3. Force the player config as early as possible and per instance.
-  setInterval(function () {
-    try {
-      if (window.yt && window.yt.config_) ytConfigFix(window.yt.config_);
-    } catch (e) {}
+  // 3. Force the player config as early as possible (bounded retries, ~5s).
+  var configTries = 0;
+  var configTimer = setInterval(function () {
+    fixYtConfig();
+    if (++configTries >= 100) clearInterval(configTimer);
   }, 50);
 
   try {
@@ -119,23 +122,14 @@
       var dummy =
         document.querySelector("ytd-player") ||
         document.createElement("ytd-player");
-      var cnt = dummy.polymerController || dummy.inst || dummy;
+      var cnt = dummy.polymerController || dummy;
       var proto = cnt && cnt.constructor && cnt.constructor.prototype;
       if (proto && proto.createMainAppPlayer_ && !proto.__ytAudioOnly) {
         proto.__ytAudioOnly = true;
         var orig = proto.createMainAppPlayer_;
-        proto.createMainAppPlayer_ = function (a, b, c) {
-          try {
-            if (window.yt && window.yt.config_) ytConfigFix(window.yt.config_);
-          } catch (e) {}
-          try {
-            if (a && typeof a === "object") {
-              a.deviceIsAudioOnly = true;
-              if (a.attrs) a.attrs.deviceIsAudioOnly = true;
-              if (a.args) a.args.audio_only = "1";
-            }
-          } catch (e) {}
-          return orig.call(this, a, b, c);
+        proto.createMainAppPlayer_ = function () {
+          fixYtConfig();
+          return orig.apply(this, arguments);
         };
       }
     });

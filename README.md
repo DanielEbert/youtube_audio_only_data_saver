@@ -6,9 +6,9 @@ popup.
 
 ## Layout
 
-- `youtube-audio-only/` – extension source (`manifest.json`, content/background scripts, popup)
-- `scripts/release.js` – version bump, AMO signing, update manifest, deploy
-- `test/` – background request-filter unit tests
+- `youtube-audio-only/` – extension source (`manifest.json`, `content.js`, `inject.js`, popup)
+- `scripts/release.py` – version bump, AMO signing, update manifest, deploy
+- `test/` – player-response filter unit tests
 
 ## Commands
 

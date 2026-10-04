@@ -4,7 +4,7 @@
 #   make build    package into dist/*.zip and dist/*.xpi
 #   make cp       copy built packages to /root/dufs
 #   make lint     run web-ext lint
-#   make test     run the background-filter unit tests
+#   make test     run the player-response filter unit tests
 #   make release  bump + sign (unlisted) + generate updates.json + deploy
 #   make clean    remove build artifacts
 #
@@ -48,7 +48,7 @@ lint:
 	@npx --yes web-ext@latest lint --source-dir $(EXT_DIR)
 
 test:
-	@node test/background.test.js
+	@node test/inject.test.js
 
 # sign the current source without bumping (legacy convenience target)
 sign: build
@@ -57,15 +57,15 @@ sign: build
 
 # full release: version bump + sign + updates.json + deploy
 release:
-	@node scripts/release.js --bump $(BUMP)
+	@python3 scripts/release.py --bump $(BUMP)
 
 release-version:
 	@test -n "$(NEW_VERSION)" || (echo "usage: make release-version NEW_VERSION=1.3"; exit 1)
-	@node scripts/release.js --version $(NEW_VERSION)
+	@python3 scripts/release.py --version $(NEW_VERSION)
 
 # tooling test: no AMO signing, validates staging/updates.json/deploy
 release-dry:
-	@node scripts/release.js --bump $(BUMP) --dry-run
+	@python3 scripts/release.py --bump $(BUMP) --dry-run
 
 clean:
 	@rm -rf $(DIST_DIR) web-ext-artifacts build release
