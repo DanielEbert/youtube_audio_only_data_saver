@@ -6,6 +6,8 @@ build/
 dist/
 release/
 web-ext-artifacts/
+__pycache__/
+*.pyc
 
 # Dependencies
 node_modules/
