@@ -1,0 +1,87 @@
+/* Floating Mobile Toggle Button */
+#yt-audio-toggle-btn {
+  position: fixed;
+  bottom: 75px;
+  right: 15px;
+  z-index: 999999999;
+  padding: 10px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: sans-serif;
+  border-radius: 24px;
+  border: none;
+  cursor: pointer;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
+  outline: none;
+  transition: transform 0.2s ease, background 0.2s ease;
+}
+
+#yt-audio-toggle-btn:active {
+  transform: scale(0.95);
+}
+
+#yt-audio-toggle-btn.btn-active {
+  background: #00e676;
+  color: #000;
+}
+
+#yt-audio-toggle-btn.btn-disabled {
+  background: #333333;
+  color: #ffffff;
+}
+
+/* Hide the actual video surface while audio-only mode is active */
+html.yt-audio-only-active video.html5-main-video,
+html.yt-audio-only-active .html5-main-video {
+  visibility: hidden !important;
+}
+
+html.yt-audio-only-active .html5-video-container,
+html.yt-audio-only-active #player-container-inner {
+  background: #000 !important;
+}
+
+/* Audio-Only Visual Placeholder */
+#yt-audio-only-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: #0f0f0f;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.yt-audio-box {
+  text-align: center;
+  color: #fff;
+  font-family: sans-serif;
+}
+
+.yt-audio-icon {
+  font-size: 38px;
+  margin-bottom: 6px;
+  animation: pulse 1.5s infinite ease-in-out;
+}
+
+.yt-audio-text {
+  font-size: 15px;
+  font-weight: bold;
+  letter-spacing: 0.5px;
+}
+
+.yt-audio-sub {
+  font-size: 12px;
+  color: #aaaaaa;
+  margin-top: 2px;
+}
+
+@keyframes pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.15); }
+  100% { transform: scale(1); }
+}

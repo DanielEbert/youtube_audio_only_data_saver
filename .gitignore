@@ -1,0 +1,24 @@
+# Local release config (contains AMO secrets)
+config.mk
+
+# Build artifacts
+build/
+dist/
+release/
+web-ext-artifacts/
+
+# Dependencies
+node_modules/
+
+# web-ext / AMO signing scratch files
+.amo-upload-uuid
+*.xpi
+*.zip
+
+# OS / editor cruft
+.DS_Store
+Thumbs.db
+*.swp
+*~
+.idea/
+.vscode/
